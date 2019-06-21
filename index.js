@@ -25,12 +25,69 @@ function exportToJsonString(idbDatabase, cb) {
 				} else {
 					exportObject[storeName] = allObjects;
 					if(idbDatabase.objectStoreNames.length === keys(exportObject).length) {
-						cb(null, JSON.stringify(exportObject));
+						cb(null, JSON.stringify(exportObject, exportReplacer));
 					}
 				}
 			};
 		});
 	}
+}
+
+/**
+ * The replacer function to be used in the export function
+ * @param {string} key - self explanatory
+ * @param {*} value - any value connected to the key
+ */
+function exportReplacer(key, value) {
+	if (isArrayBuffer(value)) {
+		return '_$AB' + ab2str(value);
+	}
+	return value;
+}
+
+/**
+ * Check if the given value is an ArrayBuffer.
+ * @param {*} value - The value to check.
+ * @returns {boolean} Returns `true` if the given value is an ArrayBuffer, else `false`.
+ * @example
+ * isArrayBuffer(new ArrayBuffer())
+ * // => true
+ * isArrayBuffer([])
+ * // => false
+ */
+function isArrayBuffer(value) {
+	const hasArrayBuffer = typeof ArrayBuffer === 'function';
+	const { toString } = Object.prototype;
+	return hasArrayBuffer && (value instanceof ArrayBuffer || toString.call(value) === '[object ArrayBuffer]');
+}
+
+/**
+ * Convert arraybuffer to string
+ * @param {ArrayBuffer} buf - the arraybuffer input
+ * @return {string} 
+ * todo: add another paramter for the agreed upon representation, so 
+ * that multiple representations may be supported: e.g. UInt16Array in 
+ * addition to the current UInt8Array.
+ */
+function ab2str(buf) {
+	return String.fromCharCode.apply(null, new Uint8Array(buf));
+}
+
+/**
+ * Convert string to arraybuffer
+ * @param {string} str - the string input
+ * @return {Arraybuffer} 
+ * todo: add another paramter for the agreed upon representation, so 
+ * that multiple representations may be supported: e.g. UInt16Array in 
+ * addition to the current UInt8Array.
+ */
+function str2ab(str) {
+	var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+	var bufView = new Uint8Array(buf);
+	for (var i=0, strLen=str.length; i < strLen; i++) {
+		bufView[i] = str.charCodeAt(i);
+	}
+	return buf;
 }
 
 /**
@@ -46,7 +103,7 @@ function importFromJsonString(idbDatabase, jsonString, cb) {
 	transaction.onerror = function(event) {
 		cb(event);
 	};
-	var importObject = JSON.parse(jsonString);
+	var importObject = JSON.parse(jsonString, importResolver);
 	forEach(idbDatabase.objectStoreNames, function(storeName) {
 		var count = 0;
 		forEach(importObject[storeName], function(toAdd) {
@@ -61,6 +118,19 @@ function importFromJsonString(idbDatabase, jsonString, cb) {
 				}
 		});
 	});
+}
+
+/**
+ * The replacer function to be used in the export function
+ * @param {string} key - self explanatory
+ * @param {*} value - any value connected to the key
+ */
+function importResolver(key, value) {
+	if (typeof value === 'string' && value.startsWith('_$AB')) {
+		var valueWithoutPrefix = value.slice(4);
+		return str2ab(valueWithoutPrefix);
+	}
+	return value;
 }
 
 /**
