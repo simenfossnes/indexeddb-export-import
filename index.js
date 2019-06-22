@@ -1,6 +1,8 @@
 var forEach = require('lodash.foreach');
 var keys = require('lodash.keys');
 
+var arrayBufferPrefix = '_$AB'
+
 /**
  * Export all data from an IndexedDB database
  * @param {IDBDatabase} idbDatabase - to export from
@@ -40,7 +42,7 @@ function exportToJsonString(idbDatabase, cb) {
  */
 function exportReplacer(key, value) {
 	if (isArrayBuffer(value)) {
-		return '_$AB' + ab2str(value);
+		return arrayBufferPrefix + escape(ab2str(value));
 	}
 	return value;
 }
@@ -99,10 +101,12 @@ function str2ab(str) {
  * @param {function(Object)} cb - callback with signature (error), where error is null on success
  */
 function importFromJsonString(idbDatabase, jsonString, cb) {
+
 	var transaction = idbDatabase.transaction(idbDatabase.objectStoreNames, "readwrite");
 	transaction.onerror = function(event) {
 		cb(event);
 	};
+
 	var importObject = JSON.parse(jsonString, importResolver);
 	forEach(idbDatabase.objectStoreNames, function(storeName) {
 		var count = 0;
@@ -126,8 +130,9 @@ function importFromJsonString(idbDatabase, jsonString, cb) {
  * @param {*} value - any value connected to the key
  */
 function importResolver(key, value) {
-	if (typeof value === 'string' && value.startsWith('_$AB')) {
-		var valueWithoutPrefix = value.slice(4);
+	if (typeof value === 'string' && value.startsWith(arrayBufferPrefix)) {
+    	var unescapedValue = unescape(value);
+		var valueWithoutPrefix = unescapedValue.slice(4);
 		return str2ab(valueWithoutPrefix);
 	}
 	return value;
