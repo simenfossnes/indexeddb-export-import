@@ -16,11 +16,11 @@ function exportToJsonString(idbDatabase, cb) {
 			cb(event, null);
 		};
 		forEach(idbDatabase.objectStoreNames, function(storeName) {
-			var allObjects = [];
+			var allObjects = {};
 			transaction.objectStore(storeName).openCursor().onsuccess = function(event) {
 				var cursor = event.target.result;
 				if (cursor) {
-					allObjects.push(cursor.value);
+					allObjects[cursor.key] = cursor.value;
 					cursor.continue();
 				} else {
 					exportObject[storeName] = allObjects;
@@ -106,8 +106,8 @@ function importFromJsonString(idbDatabase, jsonString, cb) {
 	var importObject = JSON.parse(jsonString, importResolver);
 	forEach(idbDatabase.objectStoreNames, function(storeName) {
 		var count = 0;
-		forEach(importObject[storeName], function(toAdd) {
-			var request = transaction.objectStore(storeName).add(toAdd);
+		forEach(importObject[storeName], function(toAdd, key) {
+			var request = transaction.objectStore(storeName).add(toAdd, key);
 			request.onsuccess = function(event) {
 					count++;
 					if(count === importObject[storeName].length) { // added all objects for this store
